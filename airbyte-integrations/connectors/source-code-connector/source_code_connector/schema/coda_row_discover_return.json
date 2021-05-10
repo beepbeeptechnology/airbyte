@@ -1,0 +1,94 @@
+{
+    "type": "CATALOG",
+    "catalog": {
+        "streams": [
+            {
+                "name": "coda_connector",
+                "json_schema": {
+                    "$schema": "http://json-schema.org/draft-04/schema#",
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string"
+                                        },
+                                        "type": {
+                                            "type": "string"
+                                        },
+                                        "href": {
+                                            "type": "string"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "index": {
+                                            "type": "number"
+                                        },
+                                        "createdAt": {
+                                            "type": "string"
+                                        },
+                                        "updatedAt": {
+                                            "type": "string"
+                                        },
+                                        "browserLink": {
+                                            "type": "string"
+                                        },
+                                        "values": {
+                                            "type": "object",
+                                            "properties": {
+                                                "dataset_id": {
+                                                    "type": "string"
+                                                },
+                                                "table_name": {
+                                                    "type": "string"
+                                                },
+                                                "client": {
+                                                    "type": "string"
+                                                },
+                                                "client_default_project": {
+                                                    "type": "string"
+                                                },
+                                                "project_id": {
+                                                    "type": "string"
+                                                },
+                                                "table_ref": {
+                                                    "type": "string"
+                                                },
+                                                "description": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "type",
+                                        "href",
+                                        "name",
+                                        "index",
+                                        "createdAt",
+                                        "updatedAt",
+                                        "browserLink",
+                                        "values"
+                                    ]
+                                }
+                            },
+                            "href": {
+                                "type": "string"
+                            },
+                            "nextSyncToken": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        ]
+    }
+}

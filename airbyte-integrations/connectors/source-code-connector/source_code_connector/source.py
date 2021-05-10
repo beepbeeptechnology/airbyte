@@ -23,6 +23,8 @@ SOFTWARE.
 """
 
 import json
+import requests
+
 from datetime import datetime
 from typing import Dict, Generator
 
@@ -40,10 +42,44 @@ from base_python import AirbyteLogger, Source
 
 
 class SourceCodeConnector(Source):
+
+    def _api_call(self, endpoint, token, headers):
+        # get owned docs
+        coda_token = token
+        headers = headers
+        #docs_uri = 'https://coda.io/apis/v1/docs'
+        docs_uri = endpoint
+        docs_params = {'isOwner': True}
+
+        doc_response = requests.get(docs_uri, headers=headers, params=docs_params)
+
+        if doc_response.status_code == 200:
+            result = {"status": "SUCCEEDED"}
+            # get doc_ids
+            doc_response_json = doc_response.json()
+            for doc in doc_response_json['items']:
+                doc_id = doc['id']
+                tables_uri = f'https://coda.io/apis/v1/docs/{doc_id}/tables'
+                tables_response = requests.get(tables_uri, headers=headers).json()
+                
+                # get table_ids in docs and get rows 
+                for table in tables_response['items']:
+                    table_id = table['id']
+
+                    rows_params = {'useColumnNames': 'true' , 'valueFormat': 'simpleWithArrays'} 
+                    rows_uri = f'https://coda.io/apis/v1/docs/{doc_id}/tables/{table_id}/rows'
+                    rows_response = requests.get(rows_uri, headers=headers, params=rows_params).json()
+                    
+                    return rows_response
+
+    # ********************** 
+    # ********************** Implementing check connection *******************************
+    # **********************
+
     def check(self, logger: AirbyteLogger, config: json) -> AirbyteConnectionStatus:
         """
         Tests if the input configuration can be used to successfully connect to the integration
-            e.g: if a provided Stripe API token can be used to connect to the Stripe API.
+            Provided Coda API token can be used to connect to the Coda API.
 
         :param logger: Logging object to display debug/info/error to the logs
             (logs will not be accessible via airbyte UI if they are not passed to this logger)
@@ -52,13 +88,39 @@ class SourceCodeConnector(Source):
 
         :return: AirbyteConnectionStatus indicating a Success or Failure
         """
-        try:
-            # Not Implemented
+        # Validate input configuration by attempting to get the data response
+        # get owned docs
+        coda_token = config["api_key"]
+        headers = {'Authorization': f'Bearer {config["api_key"]}'}
+        docs_uri = 'https://coda.io/apis/v1/docs'
+        docs_params = {'isOwner': True}
+        doc_response = requests.get(docs_uri, headers=headers, params=docs_params)
 
-            return AirbyteConnectionStatus(status=Status.SUCCEEDED)
+        try:
+            doc_response_json = doc_response.json()
+            for doc in doc_response_json['items']:
+                doc_id = doc['id']
+                tables_uri = f'https://coda.io/apis/v1/docs/{doc_id}/tables'
+                tables_response = requests.get(tables_uri, headers=headers).json()
+                    
+                # get table_ids in docs and get rows 
+                for table in tables_response['items']:
+                    table_id = table['id']
+
+                    rows_params = {'useColumnNames': 'true' , 'valueFormat': 'simpleWithArrays'} 
+                    rows_uri = f'https://coda.io/apis/v1/docs/{doc_id}/tables/{table_id}/rows'
+                    rows_response = requests.get(rows_uri, headers=headers, params=rows_params).json()
+                    #print("rows_response", json.dumps(rows_response))
+            return AirbyteConnectionStatus(status=Status.SUCCEEDED, message="Here we go! Check succeeded")
         except Exception as e:
             return AirbyteConnectionStatus(status=Status.FAILED, message=f"An exception occurred: {str(e)}")
 
+    # ********************** END - Implementing check connection *************************
+
+
+    # ********************** 
+    # ********************** Implementing discover connection *******************************
+    # **********************
     def discover(self, logger: AirbyteLogger, config: json) -> AirbyteCatalog:
         """
         Returns an AirbyteCatalog representing the available streams and fields in this integration.
@@ -78,18 +140,102 @@ class SourceCodeConnector(Source):
         """
         streams = []
 
-        stream_name = "TableName"  # Example
-        json_schema = {  # Example
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "type": "object",
-            "properties": {"columnName": {"type": "string"}},
-        }
+        stream_name = "coda_connector"  # Example
+        json_schema = {
+                    "$schema": "http://json-schema.org/draft-04/schema#",
+                    "type": "array",
+                    "items": {
+                    "type": "object",
+                    "properties": {
+                        "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "type": {
+                                "type": "string"
+                            },
+                            "href": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "index": {
+                                "type": "number"
+                            },
+                            "createdAt": {
+                                "type": "string"
+                            },
+                            "updatedAt": {
+                                "type": "string"
+                            },
+                            "browserLink": {
+                                "type": "string"
+                            },
+                            "values": {
+                                "type": "object",
+                                "properties": {
+                                "dataset_id": {
+                                    "type": "string"
+                                },
+                                "table_name": {
+                                    "type": "string"
+                                },
+                                "client": {
+                                    "type": "string"
+                                },
+                                "client_default_project": {
+                                    "type": "string"
+                                },
+                                "project_id": {
+                                    "type": "string"
+                                },
+                                "table_ref": {
+                                    "type": "string"
+                                },
+                                "description": {
+                                    "type": "string"
+                                }
+                                }
+                            }
+                            },
+                            "required": [
+                            "id",
+                            "type",
+                            "href",
+                            "name",
+                            "index",
+                            "createdAt",
+                            "updatedAt",
+                            "browserLink",
+                            "values"
+                            ]
+                        }
+                        },
+                        "href": {
+                        "type": "string"
+                        },
+                        "nextSyncToken": {
+                        "type": "string"
+                        }
+                    }
+                    }
+                }
 
         # Not Implemented
 
         streams.append(AirbyteStream(name=stream_name, json_schema=json_schema))
         return AirbyteCatalog(streams=streams)
+    # ********************** END - Implementing discover connection *************************
 
+
+    # ********************** 
+    # ********************** Implementing read connection *******************************
+    # **********************
     def read(
         self, logger: AirbyteLogger, config: json, catalog: ConfiguredAirbyteCatalog, state: Dict[str, any]
     ) -> Generator[AirbyteMessage, None, None]:
@@ -112,12 +258,26 @@ class SourceCodeConnector(Source):
 
         :return: A generator that produces a stream of AirbyteRecordMessage contained in AirbyteMessage object.
         """
-        stream_name = "TableName"  # Example
-        data = {"columnName": "Hello World"}  # Example
+        coda_token = config["api_key"]
+        headers = {'Authorization': f'Bearer {config["api_key"]}'}
+        docs_uri = 'https://coda.io/apis/v1/docs'
+        docs_params = {'isOwner': True}
 
-        # Not Implemented
+        stream_name = "CodaRows"  # Example
+        #data = {"columnName": {"Hello World": "hi"}}
+        data_res = self._api_call(docs_uri, coda_token, headers)
+        data = data_res
 
         yield AirbyteMessage(
             type=Type.RECORD,
             record=AirbyteRecordMessage(stream=stream_name, data=data, emitted_at=int(datetime.now().timestamp()) * 1000),
         )
+    # ********************** END - Implementing read connection *************************
+
+
+# from airbyte-integrations/connectors/source-<source-name>
+# python main_dev.py spec
+# python main_dev.py check --config secrets/config.json
+# python main_dev.py discover --config secrets/config.json
+# python main_dev.py read --config secrets/config.json --catalog sample_files/configured_catalog.json
+# python main_dev.py read --config secrets/config.json --catalog source_code_connector/schema/configured_catalog.json
