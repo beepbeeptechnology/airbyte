@@ -25,8 +25,10 @@
 package io.airbyte.integrations.base;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.airbyte.commons.json.Jsons;
 import io.airbyte.protocol.models.AirbyteMessage;
 import io.airbyte.protocol.models.ConfiguredAirbyteCatalog;
+import java.util.function.Consumer;
 
 public interface Destination extends Integration {
 
@@ -36,11 +38,19 @@ public interface Destination extends Integration {
    * @param config - integration-specific configuration object as json. e.g. { "username": "airbyte",
    *        "password": "super secure" }
    * @param catalog - schema of the incoming messages.
-   * @return Consumer that accepts message. The {@link DestinationConsumer#accept(Object)} will be
-   *         called n times where n is the number of messages. {@link DestinationConsumer#close()}
-   *         will always be called once regardless of success or failure.
+   * @return Consumer that accepts message. The {@link AirbyteMessageConsumer#accept(AirbyteMessage)}
+   *         will be called n times where n is the number of messages.
+   *         {@link AirbyteMessageConsumer#close()} will always be called once regardless of success
+   *         or failure.
    * @throws Exception - any exception.
    */
-  DestinationConsumer<AirbyteMessage> write(JsonNode config, ConfiguredAirbyteCatalog catalog) throws Exception;
+  AirbyteMessageConsumer getConsumer(JsonNode config,
+                                     ConfiguredAirbyteCatalog catalog,
+                                     Consumer<AirbyteMessage> outputRecordCollector)
+      throws Exception;
+
+  static void defaultOutputRecordCollector(AirbyteMessage message) {
+    System.out.println(Jsons.serialize(message));
+  }
 
 }

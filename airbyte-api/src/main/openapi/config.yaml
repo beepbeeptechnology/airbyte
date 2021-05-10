@@ -165,6 +165,29 @@ paths:
           description: Workspace not found
         "422":
           $ref: "#/components/responses/InvalidInput"
+  /v1/notifications/try:
+    post:
+      tags:
+        - notifications
+      summary: Try sending a notifications
+      operationId: tryNotificationConfig
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Notification"
+        required: true
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationRead"
+        "404":
+          description: Notification Client not found
+        "422":
+          $ref: "#/components/responses/InvalidInput"
   /v1/source_definitions/create:
     post:
       tags:
@@ -1101,6 +1124,29 @@ paths:
           description: Job not found
         "422":
           $ref: "#/components/responses/InvalidInput"
+  /v1/jobs/cancel:
+    post:
+      tags:
+        - jobs
+      summary: Cancels a job
+      operationId: cancelJob
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobIdRequestBody"
+        required: true
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobInfoRead"
+        "404":
+          description: Job not found
+        "422":
+          $ref: "#/components/responses/InvalidInput"
   /v1/health:
     get:
       tags:
@@ -1214,6 +1260,46 @@ components:
           type: boolean
         securityUpdates:
           type: boolean
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+    Notification:
+      type: object
+      required:
+        - notificationType
+      properties:
+        # Instead of this type field, we would prefer a json schema "oneOf" but unfortunately,
+        # the jsonschema2pojo does not seem to support it yet: https://github.com/joelittlejohn/jsonschema2pojo/issues/392
+        notificationType:
+          $ref: "#/components/schemas/NotificationType"
+        slackConfiguration:
+          $ref: "#/components/schemas/SlackNotificationConfiguration"
+    SlackNotificationConfiguration:
+      type: object
+      required:
+        - webhook
+      properties:
+        webhook:
+          type: string
+    NotificationType:
+      type: string
+      enum:
+        - slack
+        # - email
+        # - webhook
+    NotificationRead:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - succeeded
+            - failed
+        message:
+          type: string
     WorkspaceIdRequestBody:
       type: object
       required:
@@ -1234,6 +1320,9 @@ components:
           $ref: "#/components/schemas/WorkspaceId"
         customerId:
           $ref: "#/components/schemas/CustomerId"
+        email:
+          type: string
+          format: email
         name:
           type: string
         slug:
@@ -1248,6 +1337,10 @@ components:
           type: boolean
         securityUpdates:
           type: boolean
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
     WorkspaceUpdate:
       type: object
       required:
@@ -1272,6 +1365,10 @@ components:
           type: boolean
         securityUpdates:
           type: boolean
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
     # SLUG
     SlugRequestBody:
       type: object
@@ -1308,6 +1405,8 @@ components:
         documentationUrl:
           type: string
           format: uri
+        icon:
+          type: string
     SourceDefinitionUpdate:
       type: object
       description: Update the SourceDefinition. Currently, the only allowed attribute to update is the default docker image version.
@@ -1338,6 +1437,8 @@ components:
         documentationUrl:
           type: string
           format: uri
+        icon:
+          type: string
     SourceDefinitionReadList:
       type: object
       required:
@@ -1356,7 +1457,7 @@ components:
       type: object
       required:
         - sourceDefinitionId
-        - connectionSpecification
+        - jobInfo
       properties:
         sourceDefinitionId:
           $ref: "#/components/schemas/SourceDefinitionId"
@@ -1364,6 +1465,8 @@ components:
           type: string
         connectionSpecification:
           $ref: "#/components/schemas/SourceDefinitionSpecification"
+        jobInfo:
+          $ref: "#/components/schemas/SynchronousJobRead"
     # SOURCE
     SourceId:
       type: string
@@ -1472,7 +1575,7 @@ components:
         catalog:
           $ref: "#/components/schemas/AirbyteCatalog"
         jobInfo:
-          $ref: "#/components/schemas/JobInfoRead"
+          $ref: "#/components/schemas/SynchronousJobRead"
     # DESTINATION DEFINITION
     DestinationDefinitionId:
       type: string
@@ -1501,6 +1604,8 @@ components:
         documentationUrl:
           type: string
           format: uri
+        icon:
+          type: string
     DestinationDefinitionUpdate:
       type: object
       required:
@@ -1531,6 +1636,8 @@ components:
         documentationUrl:
           type: string
           format: uri
+        icon:
+          type: string
     DestinationDefinitionReadList:
       type: object
       required:
@@ -1548,7 +1655,7 @@ components:
       type: object
       required:
         - destinationDefinitionId
-        - connectionSpecification
+        - jobInfo
       properties:
         destinationDefinitionId:
           $ref: "#/components/schemas/DestinationDefinitionId"
@@ -1556,6 +1663,12 @@ components:
           type: string
         connectionSpecification:
           $ref: "#/components/schemas/DestinationDefinitionSpecification"
+        jobInfo:
+          $ref: "#/components/schemas/SynchronousJobRead"
+        supportedDestinationSyncModes:
+          type: array
+          items:
+            $ref: "#/components/schemas/DestinationSyncMode"
     # DESTINATION
     DestinationId:
       type: string
@@ -1854,16 +1967,21 @@ components:
             type: array
             items:
               type: string
+        namespace:
+          type: string
+          description: Optional Source-defined namespace. Airbyte streams from the same sources should have the same namespace. Currently only used by JDBC destinations to determine what schema to write to.
     StreamJsonSchema:
       type: object
     AirbyteStreamConfiguration:
       description: the mutable part of the stream to configure the destination
       type: object
       additionalProperties: false
+      required:
+        - syncMode
+        - destinationSyncMode
       properties:
         syncMode:
           $ref: "#/components/schemas/SyncMode"
-          default: full_refresh
         cursorField:
           description: Path to the field that will be used to determine if a record is new or modified since the last sync. This field is REQUIRED if `sync_mode` is `incremental`. Otherwise it is ignored.
           type: array
@@ -1871,7 +1989,6 @@ components:
             type: string
         destinationSyncMode:
           $ref: "#/components/schemas/DestinationSyncMode"
-          default: append
         primaryKey:
           description: Paths to the fields that will be used as primary key. This field is REQUIRED if `destination_sync_mode` is `*_dedup`. Otherwise it is ignored.
           type: array
@@ -1957,7 +2074,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AttemptRead"
-
     JobStatus:
       type: string
       enum:
@@ -2041,6 +2157,33 @@ components:
           type: array
           items:
             type: string
+    SynchronousJobRead:
+      type: object
+      required:
+        - id
+        - configType
+        - createdAt
+        - endedAt
+        - succeeded
+      properties:
+        id:
+          type: string
+          format: uuid
+        configType:
+          $ref: "#/components/schemas/JobConfigType"
+        configId:
+          description: only present if a config id was provided.
+          type: string
+        createdAt:
+          type: integer
+          format: int64
+        endedAt:
+          type: integer
+          format: int64
+        succeeded:
+          type: boolean
+        logs:
+          $ref: "#/components/schemas/LogRead"
     # Health
     HealthCheckRead:
       type: object
@@ -2064,7 +2207,7 @@ components:
         message:
           type: string
         jobInfo:
-          $ref: "#/components/schemas/JobInfoRead"
+          $ref: "#/components/schemas/SynchronousJobRead"
     # Web Backend
     WbConnectionRead:
       type: object
@@ -2099,10 +2242,12 @@ components:
           $ref: "#/components/schemas/SourceRead"
         destination:
           $ref: "#/components/schemas/DestinationRead"
-        lastSync:
-          description: epoch time of last sync. null if no sync has taken place.
+        latestSyncJobCreatedAt:
+          description: epoch time of the latest sync job. null if no sync job has taken place.
           type: integer
           format: int64
+        latestSyncJobStatus:
+          $ref: "#/components/schemas/JobStatus"
         isSyncing:
           type: boolean
     WbConnectionReadList:
@@ -2125,7 +2270,7 @@ components:
         - append
         - overwrite
         #- upsert_dedup # TODO chris: SCD Type 1 can be implemented later
-        - append_dedup # SCD Type 2
+        - append_dedup # SCD Type 1 & 2
     AirbyteArchive:
       type: string
       format: binary

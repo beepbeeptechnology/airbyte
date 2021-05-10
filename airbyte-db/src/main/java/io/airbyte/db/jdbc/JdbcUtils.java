@@ -146,7 +146,7 @@ public class JdbcUtils {
         java.util.Date d = new java.util.Date(t.getTime() + (t.getNanos() / 1000000));
         o.put(columnName, toISO8601String(d));
       }
-      case BINARY, VARBINARY, LONGVARBINARY -> o.put(columnName, r.getBytes(i));
+      case BLOB, BINARY, VARBINARY, LONGVARBINARY -> o.put(columnName, r.getBytes(i));
       default -> o.put(columnName, r.getString(i));
     }
   }
@@ -188,8 +188,10 @@ public class JdbcUtils {
       case FLOAT, DOUBLE -> preparedStatement.setDouble(parameterIndex, Double.parseDouble(value));
       case REAL -> preparedStatement.setFloat(parameterIndex, Float.parseFloat(value));
       case NUMERIC, DECIMAL -> preparedStatement.setBigDecimal(parameterIndex, new BigDecimal(value));
-      case CHAR, VARCHAR, LONGVARCHAR -> preparedStatement.setString(parameterIndex, value);
-      case BINARY -> preparedStatement.setBytes(parameterIndex, DatatypeConverter.parseHexBinary(value));
+      case CHAR, NCHAR, NVARCHAR, VARCHAR, LONGVARCHAR -> preparedStatement.setString(parameterIndex, value);
+      case BINARY, BLOB -> preparedStatement.setBytes(parameterIndex, DatatypeConverter.parseHexBinary(value));
+      // since cursor are expected to be comparable, handle cursor typing strictly and error on
+      // unrecognized types
       default -> throw new IllegalArgumentException(String.format("%s is not supported.", cursorFieldType));
     }
   }
@@ -207,11 +209,13 @@ public class JdbcUtils {
       case FLOAT, DOUBLE -> JsonSchemaPrimitive.NUMBER;
       case REAL -> JsonSchemaPrimitive.NUMBER;
       case NUMERIC, DECIMAL -> JsonSchemaPrimitive.NUMBER;
-      case CHAR, VARCHAR, LONGVARCHAR -> JsonSchemaPrimitive.STRING;
+      case CHAR, NCHAR, NVARCHAR, VARCHAR, LONGVARCHAR -> JsonSchemaPrimitive.STRING;
       case DATE -> JsonSchemaPrimitive.STRING;
       case TIME -> JsonSchemaPrimitive.STRING;
       case TIMESTAMP -> JsonSchemaPrimitive.STRING;
-      case BINARY, VARBINARY, LONGVARBINARY -> JsonSchemaPrimitive.STRING;
+      case BLOB, BINARY, VARBINARY, LONGVARBINARY -> JsonSchemaPrimitive.STRING;
+      // since column types aren't necessarily meaningful to Airbyte, liberally convert all unrecgonised
+      // types to String
       default -> JsonSchemaPrimitive.STRING;
     };
   }
